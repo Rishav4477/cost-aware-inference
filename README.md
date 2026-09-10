@@ -458,7 +458,7 @@ cost-aware-inference/
 ├── deploy/             # Helm charts and Terraform infrastructure
 ├── observability/      # Prometheus and Grafana configuration
 ├── docs/               # architecture, API, deployment and operations docs
-├── docker-compose.yml
+├── compose.yaml
 ├── render.yaml
 └── README.md
 ```

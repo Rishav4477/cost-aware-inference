@@ -20,6 +20,8 @@ services:
         value: public-demo
       - key: PUBLIC_DEMO_TENANT_KEY
         generateValue: true
+      - key: PUBLIC_DEMO_PROVIDER_KEY
+        generateValue: true
       - key: REDIS_URL
         fromService:
           type: keyvalue

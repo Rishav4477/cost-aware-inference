@@ -1,47 +1,231 @@
 # Cost-Aware Multi-Cloud AI Inference Platform
 
-A runnable inference gateway that selects an eligible model endpoint using cost, latency, utilization, quality, availability, privacy policy, and per-request constraints. The platform supports OpenAI-compatible vLLM endpoints hosted in AWS, Azure, GCP, or a trusted private environment, and now includes a browser-based public sandbox for demonstrating routing behavior.
+A multi-cloud AI inference gateway that routes each request to an eligible provider using **cost, latency, utilization, quality, availability, privacy policy, and request-level constraints**.
 
-**Status:** core gateway implementation is validated locally. The public sandbox uses the real gateway/router/cache/quota/failover code path with intentionally simulated provider responses and illustrative prices. Real cloud GPU deployment and real-provider savings remain unverified; the project does not claim production uptime or measured cloud savings. See [validation evidence](docs/VALIDATION.md).
+The project includes a public interactive dashboard, OpenAI-compatible API surface, Redis-backed caching and quotas, circuit-breaker failover, Kafka-backed async jobs, Prometheus/Grafana observability, Docker/Helm/Terraform deployment assets, and OpenAI-compatible vLLM serving targets.
 
-## Public web demo
+> **Live demo:** https://cost-aware-inference.onrender.com
+>
+> The hosted sandbox uses the real gateway, scheduler, cache, quota, failover, accounting, and telemetry paths. AWS/Azure/GCP model responses and provider price/latency inputs are intentionally simulated so the demo can remain publicly accessible without GPU spend.
 
-The repository includes a responsive dashboard under `web/` and a rate-limited public API under `/public/*`. The dashboard lets visitors:
+---
 
-- send inference requests through the existing `Gateway.complete()` path;
-- choose which of AWS, Azure, and GCP are eligible for a request;
-- simulate a cloud outage and observe circuit-breaker failover;
-- inspect selected cloud/provider, attempt order, cache behavior, token usage, and estimated cost;
-- view provider inputs, routing weights, and connected platform services.
+## What this project demonstrates
 
-The hosted sandbox is deliberately safe to leave public: the browser never receives a tenant API key, prompts are capped at 4,000 characters, requests are limited per IP, and provider responses are deterministic simulations rather than billable model calls. The internal simulator endpoints require a separate server-side bearer secret and are not directly usable by the browser.
+- **Cost-aware routing** across AWS, Azure, and GCP-style inference targets.
+- **Weighted provider scoring** using cost, latency, utilization, and model quality.
+- **Hard policy filters** for cloud allowlists, privacy/trust, budget, health, and request constraints.
+- **Automatic failover** with bounded retries and circuit breakers.
+- **Redis-backed state** for cache, quotas, request coalescing, leases, and provider signals.
+- **Per-request cost accounting** based on configured provider pricing and token usage.
+- **Sensitive-request routing** that restricts traffic to explicitly trusted providers.
+- **Kafka/Redpanda asynchronous jobs** for background inference workflows.
+- **Prometheus metrics and Grafana dashboards** for request, latency, failure, cache, and cost visibility.
+- **OpenAI-compatible inference targets**, including vLLM deployments.
+- **Deployment tooling** with Docker Compose, Render, Helm, and Terraform.
 
-The public sandbox is **not** presented as a real three-cloud benchmark. Provider prices, latency inputs, utilization, and responses in `config/public-demo.yaml` are simulation inputs. The scheduler, policy filters, circuit breaker, Redis-backed state, cache, quotas, request accounting, and response routing metadata are the same implementation used by the normal API.
+---
 
-### Run the web sandbox locally
+## Live interactive demo
+
+### [Open the public sandbox →](https://cost-aware-inference.onrender.com)
+
+The browser playground lets you:
+
+1. Enter an inference prompt.
+2. Choose which clouds are eligible: **AWS, Azure, GCP**.
+3. Change the maximum output size.
+4. Enable or disable exact caching.
+5. Mark a request as **sensitive** to exercise trusted-provider routing.
+6. Simulate an AWS, Azure, or GCP outage.
+7. Run the request and inspect the routing decision.
+
+For every request, the dashboard shows the selected provider, cloud, attempt path, cache result, estimated cost, reserved cost, token usage, round-trip time, provider health, configured routing weights, and connected runtime services.
+
+### Good demo prompts
+
+Try these in the playground:
+
+```text
+Explain why a cost-aware router might choose a slightly slower cloud provider for an AI inference request.
+```
+
+```text
+Describe the trade-off between minimizing inference latency and minimizing cloud cost.
+```
+
+```text
+Explain circuit breakers and failover in a distributed inference platform in simple terms.
+```
+
+A few useful experiments:
+
+- Run the same prompt twice with **Exact cache** enabled to observe cache behavior.
+- Simulate an outage for the provider that would normally win and inspect the new attempt path.
+- Enable **Sensitive request** and observe how the trusted-provider policy changes the eligible provider set.
+- Disable one or more clouds and see how policy constraints affect the routing decision.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U[Browser / API Client] --> G[FastAPI Gateway]
+
+    G --> Q[Quota + Policy Admission]
+    Q --> C[Redis Cache / Shared State]
+    Q --> R[Weighted Router]
+
+    R --> A[AWS Target]
+    R --> Z[Azure Target]
+    R --> X[GCP Target]
+
+    A --> O[Cost + Metrics + Traces]
+    Z --> O
+    X --> O
+
+    G --> K[Kafka / Redpanda]
+    K --> W[Async Workers]
+    W --> R
+
+    S[Pricing / Health / Utilization Signals] --> K
+    K --> C
+
+    O --> P[Prometheus]
+    P --> D[Grafana]
+```
+
+### Request lifecycle
+
+```text
+Request
+  ↓
+FastAPI validation
+  ↓
+Tenant quota / budget admission
+  ↓
+Policy filtering
+  ├─ model compatibility
+  ├─ cloud allowlist
+  ├─ trusted-provider requirement
+  ├─ provider health
+  ├─ deadline
+  └─ request cost limit
+  ↓
+Weighted candidate scoring
+  ↓
+Best eligible provider
+  ↓
+Provider attempt
+  ├─ success → accounting + cache + response
+  └─ failure → circuit breaker + next candidate
+```
+
+The router computes a normalized score approximately as:
+
+```text
+score =
+    cost_weight        × normalized_cost
+  + latency_weight     × normalized_latency
+  + utilization_weight × normalized_utilization
+  + quality_weight     × quality_penalty
+```
+
+The default public sandbox weights are:
+
+| Signal | Weight |
+| --- | ---: |
+| Cost | 55% |
+| Latency | 25% |
+| Utilization | 15% |
+| Quality | 5% |
+
+Lower score wins after hard policy filters are applied.
+
+---
+
+# Run locally
+
+## Option 1 — Run the public dashboard locally
+
+This is the fastest way to explore the project.
+
+### Requirements
+
+- Python **3.12+**
+- Git
+
+No AWS, Azure, GCP, GPU, Redis, Kafka, or Docker account is required for this mode.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Rishav4477/cost-aware-inference.git
+cd cost-aware-inference
+```
+
+### 2. Create a virtual environment
+
+macOS / Linux:
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements-dev.lock
+```
+
+### 4. Start the public sandbox
+
+macOS / Linux:
+
+```bash
 export CONFIG_PATH=config/public-demo.yaml
 export PUBLIC_DEMO_ENABLED=true
-export PUBLIC_DEMO_TENANT_KEY=local-public-demo-key-change-me
-export PUBLIC_DEMO_PROVIDER_KEY=local-provider-key-change-me
 uvicorn inference.app:app --host 0.0.0.0 --port 8000
 ```
 
-Open <http://127.0.0.1:8000>. API documentation remains available at <http://127.0.0.1:8000/docs>.
+Windows PowerShell:
 
-### Deploy the public sandbox on Render
+```powershell
+$env:CONFIG_PATH="config/public-demo.yaml"
+$env:PUBLIC_DEMO_ENABLED="true"
+uvicorn inference.app:app --host 0.0.0.0 --port 8000
+```
 
-`render.yaml` defines a Docker web service and a private Redis-compatible Render Key Value service. The Blueprint wires `REDIS_URL`, enables the sandbox, generates the internal tenant and simulator-provider secrets, and uses `/readyz` as the health check.
+The sandbox automatically generates ephemeral internal demo credentials when none are supplied.
 
-The public deployment intentionally does not run Kafka because the interactive site exercises synchronous routing. Kafka-backed asynchronous jobs remain available in the full Compose/Kubernetes deployments.
+Now open:
 
-## Run the original local API demo
+```text
+http://127.0.0.1:8000
+```
 
-Requires Python 3.12. No cloud account, GPU, Docker, Redis, or Kafka is needed for this mode.
+API documentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Stop the server with `Ctrl+C`.
+
+---
+
+## Option 2 — Run the original local API demo
+
+This starts three mock providers plus the authenticated gateway.
 
 ```bash
 python3.12 -m venv .venv
@@ -50,114 +234,277 @@ pip install -r requirements-dev.lock
 python scripts/run_demo.py
 ```
 
-Open <http://127.0.0.1:8000/docs>. The script starts three clearly labeled mock providers plus the gateway. In another terminal:
+Then send a request from another terminal:
 
 ```bash
 curl http://127.0.0.1:8000/v1/chat/completions \
   -H 'Authorization: Bearer local-demo-key-change-me' \
   -H 'Content-Type: application/json' \
-  -d '{"model":"small","messages":[{"role":"user","content":"Explain caching"}]}'
+  -d '{
+    "model": "small",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Explain why caching can reduce inference cost"
+      }
+    ]
+  }'
+```
 
+Additional checks:
+
+```bash
 python scripts/smoke.py
 python scripts/benchmark.py --requests 10000 --concurrency 32
 ```
 
-Stop with Ctrl-C. Demo data is in memory and disappears on shutdown. The hardcoded demo credential is local-only; set `DEMO_API_KEY` to override it.
+The benchmark uses local mock providers. It is **not** a GPU throughput or real-cloud cost benchmark.
 
-## Run the full local stack
+---
+
+## Option 3 — Run the full local platform with Docker
+
+The full Compose stack includes:
+
+- FastAPI gateway
+- inference worker
+- provider signal publisher
+- three mock provider services
+- Redis
+- Redpanda / Kafka-compatible broker
+- Prometheus
+- Grafana
+
+Start everything:
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
+```
+
+Run the smoke test:
+
+```bash
 python scripts/smoke.py
+```
+
+Useful local endpoints:
+
+| Service | Address |
+| --- | --- |
+| Gateway | `http://127.0.0.1:8000` |
+| API docs | `http://127.0.0.1:8000/docs` |
+| Grafana | `http://127.0.0.1:3000` |
+| Prometheus | `http://127.0.0.1:9090` |
+
+Stop the stack:
+
+```bash
 docker compose down
 ```
 
-Compose runs the gateway, job worker, signal publisher, three mock model services, Redis with AOF, a Kafka-compatible Redpanda broker, Prometheus, and Grafana. Ports bind to localhost. Grafana is at <http://127.0.0.1:3000>; Prometheus is at <http://127.0.0.1:9090>.
+Remove local Redis/Kafka volumes as well:
 
-`docker compose down` preserves state. `docker compose down -v` intentionally deletes demo Redis/Kafka volumes. Compose is a single-node development stack, not an HA cloud deployment.
+```bash
+docker compose down -v
+```
 
-## What is implemented
+---
+
+## Public API example
+
+The hosted browser sandbox exposes a limited public inference endpoint without requiring visitors to receive a tenant API key.
+
+```bash
+curl https://cost-aware-inference.onrender.com/public/infer \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": "Explain cost-aware AI inference routing",
+    "allowed_clouds": ["aws", "azure", "gcp"],
+    "fail_clouds": [],
+    "cache": "exact",
+    "max_tokens": 128,
+    "sensitive": false
+  }'
+```
+
+The public sandbox applies request-size, token, deadline, and per-IP rate limits so it can remain safely accessible.
+
+For the authenticated API and additional examples, see [`docs/API.md`](docs/API.md).
+
+---
+
+## Core capabilities
 
 | Capability | Implementation |
 | --- | --- |
-| Public demo UI | Responsive browser playground, provider state, routing metadata, outage simulation, service topology |
-| Public sandbox API | Rate-limited `/public/infer` endpoint with no browser-exposed tenant secret |
-| Model gateway | Authenticated non-streaming chat completions with request validation and model aliases |
-| Multi-cloud routing | Weighted cost/latency/utilization/quality score, hard model/cloud/privacy/cost filters |
-| Reliability | Per-provider bounded concurrency, per-attempt timeout, overall deadline, circuit breakers, failover |
-| Tenant controls | API keys, atomic request/token limits, daily conservative cost reservations |
-| Cache | Tenant- and policy-isolated exact cache; cross-replica deterministic request coalescing |
-| Semantic cache | Optional embedding endpoint, cosine similarity, bounded index, TTL, explicit opt-in |
-| Privacy | Sensitive requests only reach configured trusted providers; no caching, embeddings, or async persistence |
-| Background inference | Kafka job envelopes, tenant-owned status API, idempotency keys, terminal-result deduplication |
-| Live signals | Validated versioned pricing/health/utilization events via Kafka, shared Redis snapshots |
-| Model serving | vLLM Helm chart; continuous batching handled by the inference engine |
-| Observability | Prometheus metrics, Grafana dashboard, optional OTLP traces without prompt attributes |
-| Deployment | Docker, Render Blueprint, Helm gateway/worker/signal deployments, HPA/PDB, Terraform serving module |
-| Quality | Unit/API/concurrency tests, real-Redis CI test, Compose smoke workflow, reproducible load generator |
+| Gateway | FastAPI, request validation, API-key auth, model aliases |
+| Routing | Weighted cost / latency / utilization / quality scheduler |
+| Policy | Cloud allowlists, privacy trust, health, deadline and budget filters |
+| Reliability | Timeouts, bounded concurrency, circuit breakers and provider failover |
+| Cache | Tenant-isolated exact cache and request coalescing |
+| Semantic cache | Optional embedding-based similarity reuse with TTL and bounded index |
+| Quotas | Atomic request/token limits and conservative daily cost reservation |
+| Privacy | Sensitive requests restricted to trusted providers and excluded from reuse paths |
+| Async jobs | Kafka job envelopes, idempotency, worker processing and result deduplication |
+| Live signals | Versioned pricing / health / utilization events with Redis snapshots |
+| Observability | Prometheus metrics, Grafana dashboard and optional OTLP traces |
+| Serving | OpenAI-compatible vLLM deployment target |
+| Infrastructure | Docker Compose, Render, Helm and Terraform |
+| Testing | Unit, API, concurrency, Redis integration and Compose smoke coverage |
 
-Native Bedrock, Azure OpenAI, and Vertex proprietary API protocols are not implemented. Real model integrations are OpenAI-compatible vLLM services deployed in those clouds. Streaming, tools, multimodal requests, automatic model-quality evaluation, cloud account provisioning, and automatic GPU-price discovery remain outside this version.
+---
 
-## Architecture
+## Configuration profiles
 
-```mermaid
-flowchart TD
-    B[Browser demo] --> P[Public sandbox API]
-    C[API client] --> G[FastAPI gateway]
-    P --> G
-    G --> R[Redis quotas and cache]
-    G --> S[Weighted scheduler]
-    S --> A[AWS vLLM / demo provider]
-    S --> Z[Azure vLLM / demo provider]
-    S --> X[GCP vLLM / demo provider]
-    G --> K[Kafka jobs]
-    K --> W[Inference workers]
-    W --> S
-    T[Signal publisher] --> E[Kafka signals]
-    E --> U[Signal consumer]
-    U --> R
-    G --> M[Prometheus and Grafana]
-    W --> M
+`CONFIG_PATH` selects the runtime YAML configuration.
+
+| File | Purpose |
+| --- | --- |
+| `config/public-demo.yaml` | Browser sandbox with in-process simulated cloud providers |
+| `config/demo.yaml` | Original lightweight local mock demo |
+| `config/compose.yaml` | Full Docker Compose environment |
+| `config/production.example.yaml` | Template for real OpenAI-compatible provider endpoints |
+
+Important environment variables include:
+
+```text
+CONFIG_PATH
+REDIS_URL
+KAFKA_BOOTSTRAP_SERVERS
+PUBLIC_DEMO_ENABLED
 ```
 
-Use one Uvicorn process per pod and scale gateway pods through the HPA. Quotas, cache, and jobs share Redis. Circuit state and concurrency limits are per process; aggregate provider capacity must account for replica count. Kafka jobs process sequentially per worker; scale workers up to the job-topic partition count. See [architecture and tradeoffs](docs/ARCHITECTURE.md).
+Production deployments must use real tenant credentials and shared state. Do not use the public-demo configuration for customer traffic.
 
-## API and configuration
+---
 
-See [API examples](docs/API.md), [deployment guide](docs/DEPLOYMENT.md), and [operations runbook](docs/RUNBOOK.md).
+## Real cloud deployment model
 
-`CONFIG_PATH` selects YAML:
+The project is designed so each provider can point to an OpenAI-compatible inference service running in a different cloud, for example:
 
-- `config/demo.yaml` — original local three-process simulation;
-- `config/public-demo.yaml` — browser sandbox with in-process simulated providers;
-- `config/compose.yaml` — full Docker Compose stack;
-- `config/production.example.yaml` — template for real OpenAI-compatible inference endpoints.
+```text
+                        FastAPI Gateway
+                              │
+                 ┌────────────┼────────────┐
+                 │            │            │
+                 ▼            ▼            ▼
+               AWS          Azure         GCP
+              vLLM          vLLM          vLLM
+                 │            │            │
+                 └────────────┼────────────┘
+                              │
+                     Redis + Kafka +
+                  Prometheus / Grafana
+```
 
-`REDIS_URL` and `KAFKA_BOOTSTRAP_SERVERS` are environment variables. Production refuses to start without Redis or configured tenant keys. Do not deploy a demo configuration for real customer traffic.
+The repository includes Helm and Terraform assets for this deployment model, but the public Render sandbox intentionally uses simulated providers instead of always-on cloud GPUs.
 
-Optional semantic reuse requires `embedding_url`, `embedding_model`, and optionally `EMBEDDING_API_KEY`. It is disabled by default. Exact cache is bypassed for nonzero temperature. See [SECURITY.md](SECURITY.md).
+Native proprietary Bedrock, Azure OpenAI, and Vertex AI protocols are not implemented in this version. Real provider integration currently targets OpenAI-compatible endpoints such as vLLM.
 
-## Tests and evidence
+---
+
+## Deploy on Render
+
+A Render Blueprint is included in [`render.yaml`](render.yaml).
+
+It defines:
+
+- the public web service;
+- a Redis-compatible Render Key Value store;
+- the public-demo configuration;
+- generated internal demo credentials;
+- the shared `REDIS_URL` connection;
+- `/readyz` health checking.
+
+The currently hosted deployment is available at:
+
+### https://cost-aware-inference.onrender.com
+
+---
+
+## Testing
+
+Run the core test suite:
 
 ```bash
 ruff check .
 ruff format --check .
 python -m pytest -q
-TEST_REDIS_URL=redis://localhost:6379/15 python -m pytest tests/test_redis_integration.py -q
 ```
 
-GitHub Actions defines lint/tests, Redis integration, Helm/Terraform validation, and a full Compose/Kafka smoke test. The checked-in [local benchmark JSON](docs/benchmark-local.json) records mock-service measurements, not GPU throughput or cloud savings.
+With a local Redis instance:
 
-## Repository map
+```bash
+TEST_REDIS_URL=redis://localhost:6379/15 \
+python -m pytest tests/test_redis_integration.py -q
+```
 
-- `inference/`: API, routing, state, cache, jobs, workers, telemetry, and public sandbox endpoints.
-- `web/`: public demo dashboard served by FastAPI.
-- `tests/`: policy, concurrency, failure, API, cache, and integration tests.
-- `scripts/`: demo launcher, smoke test, load generator, signal publisher.
-- `deploy/`: gateway and vLLM Helm charts; multi-context Terraform serving deployment.
-- `observability/`: provisioned dashboard and Prometheus scrape configuration.
-- `docs/`: architecture, API, deployment, operations, validation, and decisions.
-- `render.yaml`: reproducible public sandbox deployment.
+GitHub Actions also defines lint/tests, Redis integration, Helm/Terraform validation, and a full Compose/Kafka smoke test.
 
-Private during development. An open-source license has deliberately not been selected; choose one before making the repository public. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Validation notes and benchmark evidence are documented in [`docs/VALIDATION.md`](docs/VALIDATION.md).
+
+---
+
+## Repository structure
+
+```text
+cost-aware-inference/
+├── inference/          # gateway, router, cache, jobs, workers and telemetry
+├── web/                # public interactive dashboard
+├── config/             # demo, compose and production configuration profiles
+├── tests/              # unit, API, concurrency and integration tests
+├── scripts/            # demo launcher, smoke tests and load generation
+├── deploy/             # Helm charts and Terraform infrastructure
+├── observability/      # Prometheus and Grafana configuration
+├── docs/               # architecture, API, deployment and operations docs
+├── docker-compose.yml
+├── render.yaml
+└── README.md
+```
+
+---
+
+## Design docs
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture and trade-offs
+- [`docs/API.md`](docs/API.md) — API usage and examples
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — deployment guide
+- [`docs/RUNBOOK.md`](docs/RUNBOOK.md) — operations runbook
+- [`docs/VALIDATION.md`](docs/VALIDATION.md) — validation evidence and scope
+- [`SECURITY.md`](SECURITY.md) — security considerations
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow
+
+---
+
+## Scope and transparency
+
+The public demo is intended to demonstrate the **control plane** rather than claim production-scale GPU performance.
+
+What is real in the hosted demo:
+
+- gateway request handling;
+- routing and policy decisions;
+- cache behavior;
+- quotas and cost reservation;
+- circuit-breaker logic;
+- failover;
+- Redis-backed state;
+- routing metadata and estimated-cost accounting.
+
+What is simulated in the hosted demo:
+
+- model-generated provider responses;
+- AWS/Azure/GCP latency inputs;
+- utilization values;
+- provider pricing snapshots.
+
+No claim is made that the public sandbox represents measured AWS, Azure, or GCP GPU throughput, pricing, savings, or production uptime.
+
+---
+
+## Contributing
+
+Contributions, bug reports, and design discussions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
+
+If you plan to make a public fork or redistribute the project, check the repository license status first. A license should be selected before broad external reuse or contribution is encouraged.

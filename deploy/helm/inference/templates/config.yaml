@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  providers.yaml: |
+{{ required "Set config to a complete production provider YAML" .Values.config | indent 4 }}

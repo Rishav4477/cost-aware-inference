@@ -1,0 +1,21 @@
+{
+  "scenario": "local-mock",
+  "requests": 10000,
+  "concurrency": 32,
+  "successes": 10000,
+  "errors": {},
+  "providers": {
+    "azure-demo": 1492,
+    "gcp-demo": 73,
+    "aws-demo": 8435
+  },
+  "completion_ratio": 1.0,
+  "elapsed_seconds": 26.375040192999904,
+  "requests_per_second": 379.1463416481944,
+  "p50_ms": 78.26546299997972,
+  "p95_ms": 108.9630720000514,
+  "p99_ms": 145.55871300012768,
+  "mean_ms": 82.65384465159957,
+  "estimated_success_cost_usd": 0.18085589999999999,
+  "note": "End-to-end HTTP latency; prices are configured inputs. Local demo uses no actual LLM or cloud."
+}

@@ -1,0 +1,71 @@
+{{- if ne (int .Values.replicas) 1 }}
+{{- fail "This RWO chart requires replicas=1; use independent releases for additional replicas" }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-models
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- if .Values.storageClassName }}
+  storageClassName: {{ .Values.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests: {storage: {{ .Values.storageSize }}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: {{ .Release.Name }}}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      containers:
+        - name: vllm
+          image: {{ .Values.image | quote }}
+          args: [--model, {{ .Values.model | quote }}, --host, "0.0.0.0", --port, "8000", --max-model-len, {{ .Values.maxModelLen | quote }}]
+          env:
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef: {name: {{ .Values.existingSecret }}, key: api-key}
+            - {name: HF_HOME, value: /models}
+          ports: [{name: http, containerPort: 8000}]
+          resources:
+            requests: {cpu: "2", memory: 6Gi, nvidia.com/gpu: {{ .Values.gpuCount }}}
+            limits: {cpu: "4", memory: 12Gi, nvidia.com/gpu: {{ .Values.gpuCount }}}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            failureThreshold: 120
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: {{ .Release.Name }}-models}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector: {app: {{ .Release.Name }}}
+  ports: [{name: http, port: 8000, targetPort: http}]

@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+*.tfstate*
+.terraform/
+*.tfvars
+!*.tfvars.example
+*.pem
+*.key
+benchmark-local.json
+*.egg-info/
+build/
+dist/
+!docs/benchmark-local.json

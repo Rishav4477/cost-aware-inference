@@ -1,0 +1,6 @@
+apiVersion: v2
+name: inference
+version: 0.1.0
+appVersion: "0.1.0"
+description: Multi-cloud inference gateway and Kafka workers
+type: application

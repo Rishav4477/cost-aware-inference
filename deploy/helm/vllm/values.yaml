@@ -1,0 +1,13 @@
+image: vllm/vllm-openai:v0.19.1
+model: Qwen/Qwen2.5-0.5B-Instruct
+existingSecret: vllm-secrets
+replicas: 1
+gpuCount: 1
+maxModelLen: 4096
+nodeSelector: {}
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+storageClassName: ""
+storageSize: 20Gi

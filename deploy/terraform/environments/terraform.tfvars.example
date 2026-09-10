@@ -1,0 +1,4 @@
+kubeconfig    = "/absolute/path/to/your/kubeconfig"
+aws_context   = "your-eks-context"
+azure_context = "your-aks-context"
+gcp_context   = "your-gke-context"

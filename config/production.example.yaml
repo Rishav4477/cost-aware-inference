@@ -1,0 +1,40 @@
+# Connect to vLLM deployed in your cloud clusters, not native proprietary APIs.
+# Replace URLs, model names and unit prices using measured utilization and billing.
+demo: false
+require_signals: true
+signal_ttl: 60
+attempt_timeout: 2
+cache_ttl: 300
+weights: {cost: 0.55, latency: 0.25, utilization: 0.15, quality: 0.05}
+providers:
+  - id: aws-vllm
+    cloud: aws
+    base_url: https://inference.aws.example.com/v1
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    aliases: [small]
+    api_key_env: AWS_VLLM_API_KEY
+    input_usd_per_million: 1
+    output_usd_per_million: 2
+  - id: azure-vllm
+    cloud: azure
+    base_url: https://inference.azure.example.com/v1
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    aliases: [small]
+    api_key_env: AZURE_VLLM_API_KEY
+    input_usd_per_million: 1
+    output_usd_per_million: 2
+  - id: gcp-vllm
+    cloud: gcp
+    base_url: https://inference.gcp.example.com/v1
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    aliases: [small]
+    api_key_env: GCP_VLLM_API_KEY
+    trusted: true
+    input_usd_per_million: 1
+    output_usd_per_million: 2
+tenants:
+  - id: primary
+    key_env: PRIMARY_API_KEY
+    requests_per_minute: 120
+    tokens_per_minute: 100000
+    daily_budget_usd: 10

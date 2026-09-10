@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-10",
+  "python": "3.12.14",
+  "tests_passed": 38,
+  "tests_skipped": 0,
+  "redis_version": "7.4.2",
+  "helm_lint": "passed",
+  "helm_render": "passed",
+  "terraform_format": "passed",
+  "terraform_validate": "blocked: provider plugin startup handshake failed",
+  "compose_runtime": "not run: docker unavailable",
+  "gpu_cloud_runtime": "not run",
+  "repository": "https://github.com/Rishav4477/cost-aware-inference"
+}

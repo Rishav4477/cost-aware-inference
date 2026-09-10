@@ -1,0 +1,61 @@
+{{- range $role := list "gateway" "worker" "signals" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  replicas: {{ if eq $role "gateway" }}{{ $.Values.replicas }}{{ else if eq $role "worker" }}{{ $.Values.workerReplicas }}{{ else }}1{{ end }}
+  selector:
+    matchLabels: {app: {{ $.Release.Name }}, role: {{ $role }}}
+  template:
+    metadata:
+      labels: {app: {{ $.Release.Name }}, role: {{ $role }}}
+      annotations:
+        checksum/config: {{ $.Values.config | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: {{ $role }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          {{- if eq $role "worker" }}
+          command: [python, -m, inference.worker]
+          {{- else if eq $role "signals" }}
+          command: [python, -m, scripts.publish_signals]
+          {{- end }}
+          env:
+            - {name: CONFIG_PATH, value: /config/providers.yaml}
+            - {name: REDIS_URL, value: {{ $.Values.redisUrl | quote }}}
+            - {name: KAFKA_BOOTSTRAP_SERVERS, value: {{ $.Values.kafkaBootstrap | quote }}}
+          envFrom:
+            - secretRef: {name: {{ $.Values.existingSecret }}}
+          resources:
+{{ toYaml $.Values.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+          {{- if eq $role "gateway" }}
+          ports: [{containerPort: 8000, name: http}]
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 20
+          {{- end }}
+      volumes:
+        - name: config
+          configMap: {name: {{ $.Release.Name }}-config}
+        - name: tmp
+          emptyDir: {}
+{{- end }}

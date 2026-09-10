@@ -1,0 +1,19 @@
+image:
+  repository: ghcr.io/your-account/cost-aware-inference
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+replicas: 2
+workerReplicas: 1
+existingSecret: inference-secrets
+redisUrl: redis://redis:6379/0
+kafkaBootstrap: kafka:9092
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: "1", memory: 512Mi}
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  cpuPercent: 70
+# Required: full production YAML. Never put credentials here; use existingSecret.
+config: ""

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vllm-serving
+version: 0.1.0
+appVersion: "0.19.1"
+description: Authenticated vLLM on an existing GPU Kubernetes cluster
+type: application

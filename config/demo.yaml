@@ -1,0 +1,39 @@
+# Prices are illustrative simulation inputs, NOT current cloud prices.
+demo: true
+attempt_timeout: 1
+breaker_threshold: 1
+breaker_cooldown: 5
+cache_ttl: 300
+providers:
+  - id: aws-demo
+    cloud: aws
+    base_url: http://127.0.0.1:8101/v1
+    model: demo-model
+    aliases: [small]
+    input_usd_per_million: 0.10
+    output_usd_per_million: 0.30
+    latency_ms: 40
+  - id: azure-demo
+    cloud: azure
+    base_url: http://127.0.0.1:8102/v1
+    model: demo-model
+    aliases: [small]
+    input_usd_per_million: 0.20
+    output_usd_per_million: 0.50
+    latency_ms: 70
+  - id: gcp-demo
+    cloud: gcp
+    base_url: http://127.0.0.1:8103/v1
+    model: demo-model
+    aliases: [small]
+    trusted: true
+    input_usd_per_million: 0.30
+    output_usd_per_million: 0.60
+    latency_ms: 100
+    concurrency: 32
+tenants:
+  - id: demo
+    key_env: DEMO_API_KEY
+    requests_per_minute: 100000
+    tokens_per_minute: 100000000
+    daily_budget_usd: 100

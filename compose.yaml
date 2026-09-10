@@ -1,0 +1,82 @@
+name: cost-aware-inference
+x-app: &app
+  build: .
+  environment: &env
+    CONFIG_PATH: config/compose.yaml
+    REDIS_URL: redis://redis:6379/0
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    DEMO_API_KEY: ${DEMO_API_KEY:-local-demo-key-change-me}
+  depends_on: &deps
+    redis: {condition: service_healthy}
+    kafka-init: {condition: service_completed_successfully}
+  restart: unless-stopped
+services:
+  gateway:
+    <<: *app
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  worker:
+    <<: *app
+    command: [python, -m, inference.worker]
+  signals:
+    <<: *app
+    command: [python, -m, scripts.publish_signals]
+  mock-aws:
+    build: .
+    command: [uvicorn, inference.mock_provider:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:8101:8000"]
+  mock-azure:
+    build: .
+    command: [uvicorn, inference.mock_provider:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:8102:8000"]
+  mock-gcp:
+    build: .
+    command: [uvicorn, inference.mock_provider:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:8103:8000"]
+  redis:
+    image: redis:7.4.2-alpine
+    command: [redis-server, --appendonly, "yes", --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+  kafka:
+    image: redpandadata/redpanda:v24.3.10
+    command: [redpanda, start, --overprovisioned, --smp, "1", --memory, 512M, --reserve-memory, 0M, --node-id, "0", --check=false, --kafka-addr, 0.0.0.0:9092, --advertise-kafka-addr, kafka:9092]
+    volumes: [kafka-data:/var/lib/redpanda/data]
+    healthcheck:
+      test: [CMD, rpk, cluster, health]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  kafka-init:
+    image: redpandadata/redpanda:v24.3.10
+    depends_on:
+      kafka: {condition: service_healthy}
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        rpk topic describe inference.jobs -X brokers=kafka:9092 >/dev/null 2>&1 || rpk topic create inference.jobs -p 6 -c retention.ms=86400000 -X brokers=kafka:9092
+        rpk topic describe inference.signals -X brokers=kafka:9092 >/dev/null 2>&1 || rpk topic create inference.signals -p 3 -c retention.ms=3600000 -X brokers=kafka:9092
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    volumes: [./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["127.0.0.1:9090:9090"]
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-grafana-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/dashboard.json:/var/lib/grafana/dashboards/inference.json:ro
+    ports: ["127.0.0.1:3000:3000"]
+volumes:
+  redis-data:
+  kafka-data:

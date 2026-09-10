@@ -63,8 +63,14 @@ function renderStatus(data) {
     services.innerHTML = "";
     Object.entries(data.services || {}).forEach(([name, active]) => {
       const item = document.createElement("span");
+      const isKafka = name.toLowerCase() === "kafka";
       item.className = `service ${active ? "on" : "off"}`;
-      item.textContent = name.replaceAll("_", " ");
+      item.textContent = isKafka && !active
+        ? "kafka · optional / async jobs"
+        : name.replaceAll("_", " ");
+      if (isKafka && !active) {
+        item.title = "Kafka/Redpanda is supported for asynchronous jobs, but is intentionally not deployed in the public Render sandbox.";
+      }
       services.appendChild(item);
     });
   }

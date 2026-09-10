@@ -14,7 +14,7 @@ The repository includes a responsive dashboard under `web/` and a rate-limited p
 - inspect selected cloud/provider, attempt order, cache behavior, token usage, and estimated cost;
 - view provider inputs, routing weights, and connected platform services.
 
-The hosted sandbox is deliberately safe to leave public: the browser never receives a tenant API key, prompts are capped at 4,000 characters, requests are limited per IP, and provider responses are deterministic simulations rather than billable model calls.
+The hosted sandbox is deliberately safe to leave public: the browser never receives a tenant API key, prompts are capped at 4,000 characters, requests are limited per IP, and provider responses are deterministic simulations rather than billable model calls. The internal simulator endpoints require a separate server-side bearer secret and are not directly usable by the browser.
 
 The public sandbox is **not** presented as a real three-cloud benchmark. Provider prices, latency inputs, utilization, and responses in `config/public-demo.yaml` are simulation inputs. The scheduler, policy filters, circuit breaker, Redis-backed state, cache, quotas, request accounting, and response routing metadata are the same implementation used by the normal API.
 
@@ -27,6 +27,7 @@ pip install -r requirements-dev.lock
 export CONFIG_PATH=config/public-demo.yaml
 export PUBLIC_DEMO_ENABLED=true
 export PUBLIC_DEMO_TENANT_KEY=local-public-demo-key-change-me
+export PUBLIC_DEMO_PROVIDER_KEY=local-provider-key-change-me
 uvicorn inference.app:app --host 0.0.0.0 --port 8000
 ```
 
@@ -34,7 +35,7 @@ Open <http://127.0.0.1:8000>. API documentation remains available at <http://127
 
 ### Deploy the public sandbox on Render
 
-`render.yaml` defines a Docker web service and a private Redis-compatible Render Key Value service. The Blueprint wires `REDIS_URL`, enables the sandbox, generates its internal tenant key, and uses `/readyz` as the health check.
+`render.yaml` defines a Docker web service and a private Redis-compatible Render Key Value service. The Blueprint wires `REDIS_URL`, enables the sandbox, generates the internal tenant and simulator-provider secrets, and uses `/readyz` as the health check.
 
 The public deployment intentionally does not run Kafka because the interactive site exercises synchronous routing. Kafka-backed asynchronous jobs remain available in the full Compose/Kubernetes deployments.
 

@@ -1,6 +1,7 @@
 import asyncio
 import hmac
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -56,6 +57,9 @@ def create_app(settings=None, store=None, client=None):
         cfg = settings or Settings.load()
         app.state.public_demo_enabled = os.getenv("PUBLIC_DEMO_ENABLED", "false").lower() == "true"
         if app.state.public_demo_enabled:
+            for key_name in ("PUBLIC_DEMO_TENANT_KEY", "PUBLIC_DEMO_PROVIDER_KEY"):
+                if not os.getenv(key_name):
+                    os.environ[key_name] = secrets.token_urlsafe(32)
             port = os.getenv("PORT", "8000")
             for provider in cfg.providers:
                 if provider.id.startswith("public-"):

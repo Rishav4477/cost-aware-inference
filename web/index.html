@@ -9,35 +9,55 @@
 </head>
 <body>
   <div class="shell">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">PUBLIC SANDBOX</div>
-        <h1>Cost-Aware Multi-Cloud AI Inference</h1>
-        <p class="subtitle">Send one request. Watch the gateway score providers, route across clouds, fail over, and account for estimated cost.</p>
+    <nav class="nav">
+      <div class="brand"><span class="brand-mark">CA</span><span>Multi-Cloud Inference</span></div>
+      <div class="nav-links">
+        <a href="#playground">Playground</a>
+        <a href="#architecture">Architecture</a>
+        <a href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
       </div>
-      <div class="status-pill"><span class="dot"></span><span id="systemStatus">Checking system</span></div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">PUBLIC ENGINEERING SANDBOX</div>
+        <h1>Route AI inference across clouds with <span>cost-aware decisions.</span></h1>
+        <p class="subtitle">A working FastAPI inference gateway that evaluates provider cost, latency, utilization, quality, health, privacy policy, and request constraints before selecting where each request should run.</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="#playground">Try the router</a>
+          <div class="status-pill"><span class="dot"></span><span id="systemStatus">Checking gateway</span></div>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><strong>3</strong><span>Cloud targets</span><small>AWS · Azure · GCP</small></div>
+        <div class="stat"><strong>4</strong><span>Weighted signals</span><small>Cost · latency · load · quality</small></div>
+        <div class="stat"><strong>5s</strong><span>Demo deadline</span><small>End-to-end request budget</small></div>
+        <div class="stat"><strong>30</strong><span>Requests / min</span><small>Public per-IP guardrail</small></div>
+      </div>
     </header>
 
     <section class="notice">
-      <strong>What is real in this demo?</strong>
-      <span>The FastAPI gateway, routing policy, circuit breaker, failover, cache, quota admission, cost accounting, and observability path are real. Provider responses and displayed cloud prices are simulated so the public demo can stay online without GPU spend.</span>
+      <div class="notice-icon">i</div>
+      <div><strong>Real control plane, simulated model providers.</strong><span>The gateway, weighted scheduler, policy filters, circuit breaker, failover, Redis-backed state, caching, quota admission, accounting, and telemetry code paths are real. Provider responses and displayed cloud price/latency inputs are intentionally simulated so this demo can remain publicly accessible without GPU spend.</span></div>
+    </section>
+
+    <section class="section-intro" id="playground">
+      <div><div class="eyebrow">INTERACTIVE DEMO</div><h2>See a routing decision happen</h2></div>
+      <p>Change cloud eligibility, simulate failures, enable trusted-only routing, and repeat a deterministic prompt to observe cache behavior.</p>
     </section>
 
     <main class="grid">
       <section class="panel playground">
         <div class="panel-head">
-          <div>
-            <div class="eyebrow">INFERENCE PLAYGROUND</div>
-            <h2>Test the router</h2>
-          </div>
+          <div><div class="eyebrow">REQUEST BUILDER</div><h3>Inference playground</h3></div>
           <button class="ghost" id="exampleBtn" type="button">Load example</button>
         </div>
 
-        <label class="field-label" for="prompt">Prompt</label>
+        <label class="field-label" for="prompt">Prompt <span id="promptCount">0 / 4000</span></label>
         <textarea id="prompt" rows="7" maxlength="4000" placeholder="Ask something to send through the inference gateway..."></textarea>
 
         <div class="controls-row">
-          <div>
+          <div class="control-block">
             <div class="field-label">Eligible clouds</div>
             <div class="checks" id="cloudChecks">
               <label><input type="checkbox" value="aws" checked> AWS</label>
@@ -45,87 +65,87 @@
               <label><input type="checkbox" value="gcp" checked> GCP</label>
             </div>
           </div>
-          <div>
-            <div class="field-label">Simulate outage</div>
-            <select id="failureCloud">
-              <option value="">None</option>
-              <option value="aws">AWS</option>
-              <option value="azure">Azure</option>
-              <option value="gcp">GCP</option>
-            </select>
+          <div class="control-block">
+            <label class="field-label" for="failureCloud">Simulate outage</label>
+            <select id="failureCloud"><option value="">None</option><option value="aws">AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select>
           </div>
-          <div>
-            <div class="field-label">Cache</div>
-            <select id="cacheMode">
-              <option value="exact">Exact cache</option>
-              <option value="off">Off</option>
-            </select>
+          <div class="control-block">
+            <label class="field-label" for="cacheMode">Cache policy</label>
+            <select id="cacheMode"><option value="exact">Exact cache</option><option value="off">Off</option></select>
+          </div>
+          <div class="control-block">
+            <label class="field-label" for="maxTokens">Max output</label>
+            <select id="maxTokens"><option value="64">64 tokens</option><option value="128" selected>128 tokens</option><option value="256">256 tokens</option><option value="512">512 tokens</option></select>
           </div>
         </div>
 
+        <label class="policy-toggle">
+          <input type="checkbox" id="sensitiveToggle">
+          <span><strong>Sensitive request</strong><small>Restrict routing to providers explicitly marked trusted. In this sandbox, this demonstrates the privacy policy gate.</small></span>
+        </label>
+
         <div class="actions">
-          <button class="primary" id="runBtn" type="button">Run inference</button>
-          <span class="hint">Public limit: 30 requests/minute per IP</span>
+          <button class="primary" id="runBtn" type="button"><span>Run inference</span><b>→</b></button>
+          <span class="hint">No API key required · 4,000 character prompt limit</span>
         </div>
 
         <div class="result hidden" id="resultBox">
-          <div class="result-head">
-            <span>Response</span>
-            <span class="route-badge" id="routeBadge">—</span>
-          </div>
+          <div class="result-head"><span>Gateway response</span><span class="route-badge" id="routeBadge">—</span></div>
           <div class="answer" id="answer"></div>
           <div class="metrics-grid">
-            <div><span>Cloud</span><strong id="metricCloud">—</strong></div>
+            <div><span>Selected cloud</span><strong id="metricCloud">—</strong></div>
             <div><span>Provider</span><strong id="metricProvider">—</strong></div>
-            <div><span>Attempts</span><strong id="metricAttempts">—</strong></div>
-            <div><span>Cache</span><strong id="metricCache">—</strong></div>
-            <div><span>Est. cost</span><strong id="metricCost">—</strong></div>
-            <div><span>Total tokens</span><strong id="metricTokens">—</strong></div>
+            <div><span>Attempt path</span><strong id="metricAttempts">—</strong></div>
+            <div><span>Cache result</span><strong id="metricCache">—</strong></div>
+            <div><span>Estimated cost</span><strong id="metricCost">—</strong></div>
+            <div><span>Reserved cost</span><strong id="metricReserved">—</strong></div>
+            <div><span>Prompt tokens</span><strong id="metricPromptTokens">—</strong></div>
+            <div><span>Output tokens</span><strong id="metricOutputTokens">—</strong></div>
+            <div><span>Round trip</span><strong id="metricRoundTrip">—</strong></div>
           </div>
+          <div class="result-note"><span class="mini-dot"></span><span>Cost is calculated from the selected provider's configured price snapshot and returned token usage.</span></div>
         </div>
-
         <div class="error hidden" id="errorBox"></div>
       </section>
 
-      <aside class="panel architecture-panel">
-        <div class="eyebrow">LIVE PLATFORM STATE</div>
-        <h2>Provider pool</h2>
-        <div id="providerList" class="providers"></div>
-
+      <aside class="panel side-panel">
+        <div class="side-section"><div class="eyebrow">LIVE PLATFORM STATE</div><div class="side-title"><h3>Provider pool</h3><span class="live-tag">LIVE</span></div><div id="providerList" class="providers"></div></div>
         <div class="divider"></div>
-        <div class="eyebrow">ROUTING WEIGHTS</div>
-        <div id="weights" class="weights"></div>
-
+        <div class="side-section"><div class="eyebrow">SCHEDULER CONFIGURATION</div><h3>Routing weights</h3><p class="microcopy">Lower normalized score wins after hard policy filters are applied.</p><div id="weights" class="weights"></div></div>
         <div class="divider"></div>
-        <div class="eyebrow">CONNECTED SERVICES</div>
-        <div id="services" class="services"></div>
+        <div class="side-section"><div class="eyebrow">RUNTIME DEPENDENCIES</div><h3>Connected services</h3><div id="services" class="services"></div></div>
       </aside>
     </main>
 
-    <section class="panel flow-panel">
-      <div class="panel-head">
-        <div>
-          <div class="eyebrow">REQUEST PATH</div>
-          <h2>How one request moves through the system</h2>
-        </div>
-      </div>
+    <section class="details-grid">
+      <article class="detail-card"><div class="card-index">01</div><h3>Policy gates first</h3><p>Before scoring, the gateway filters providers by model alias, cloud allowlist, privacy trust, health, deadline, utilization, and per-request maximum cost.</p><div class="chips"><span>Model</span><span>Privacy</span><span>Health</span><span>Budget</span></div></article>
+      <article class="detail-card"><div class="card-index">02</div><h3>Then score candidates</h3><p>Eligible providers receive a normalized weighted score. The current sandbox gives cost the largest influence while still accounting for latency, utilization, and model quality.</p><code>score = wc·cost + wl·latency + wu·load + wq·quality_penalty</code></article>
+      <article class="detail-card"><div class="card-index">03</div><h3>Fail over automatically</h3><p>Provider attempts are deadline-bounded. Errors feed a circuit breaker, and the gateway continues through the ranked candidate list while the request budget remains.</p><div class="chips"><span>Timeouts</span><span>Circuit breaker</span><span>Retry path</span></div></article>
+    </section>
+
+    <section class="panel architecture" id="architecture">
+      <div class="section-intro compact"><div><div class="eyebrow">SYSTEM ARCHITECTURE</div><h2>From browser request to provider response</h2></div><p>The public sandbox sits on top of the same gateway interfaces used by the authenticated API.</p></div>
       <div class="flow">
-        <div class="node"><span>1</span><strong>Browser</strong><small>Public playground</small></div>
-        <div class="arrow">→</div>
-        <div class="node"><span>2</span><strong>FastAPI Gateway</strong><small>Validation + quota</small></div>
-        <div class="arrow">→</div>
-        <div class="node accent"><span>3</span><strong>Weighted Router</strong><small>Cost + latency + load</small></div>
-        <div class="arrow">→</div>
-        <div class="node"><span>4</span><strong>Cloud Provider</strong><small>AWS / Azure / GCP</small></div>
-        <div class="arrow">→</div>
-        <div class="node"><span>5</span><strong>Telemetry</strong><small>Metrics + accounting</small></div>
+        <div class="node"><span>01</span><strong>Browser</strong><small>Build request + policy</small></div><div class="arrow">→</div>
+        <div class="node"><span>02</span><strong>FastAPI Gateway</strong><small>Validation + quota admission</small></div><div class="arrow">→</div>
+        <div class="node accent"><span>03</span><strong>Weighted Router</strong><small>Filter + rank candidates</small></div><div class="arrow">→</div>
+        <div class="node"><span>04</span><strong>Provider Pool</strong><small>AWS · Azure · GCP</small></div><div class="arrow">→</div>
+        <div class="node"><span>05</span><strong>Observability</strong><small>Cost + metrics + traces</small></div>
+      </div>
+      <div class="infra-strip">
+        <div><strong>Redis</strong><span>Shared quotas, cache, leases, live signal snapshots</span></div>
+        <div><strong>Kafka / Redpanda</strong><span>Background inference jobs and provider signal events</span></div>
+        <div><strong>Prometheus</strong><span>Request, attempt, latency, cache, and estimated-cost metrics</span></div>
+        <div><strong>vLLM target</strong><span>OpenAI-compatible serving layer for real cloud deployments</span></div>
       </div>
     </section>
 
-    <footer>
-      <span>Cost-Aware Multi-Cloud AI Inference Platform</span>
-      <a href="/docs" target="_blank" rel="noreferrer">Open API docs ↗</a>
-    </footer>
+    <section class="demo-constraints">
+      <div><div class="eyebrow">PUBLIC SANDBOX BOUNDARIES</div><h2>Designed to be testable without pretending it is production traffic.</h2></div>
+      <div class="constraint-list"><div><strong>Simulated providers</strong><span>No GPU or proprietary cloud model is invoked here.</span></div><div><strong>Real routing logic</strong><span>Requests exercise the same gateway, scheduler, cache, quotas, and failover implementation.</span></div><div><strong>Guardrails</strong><span>30 requests/minute per IP, 4K-character prompts, bounded tokens and request deadlines.</span></div></div>
+    </section>
+
+    <footer><div><strong>Cost-Aware Multi-Cloud AI Inference Platform</strong><span>Public engineering sandbox</span></div><div class="footer-links"><a href="#playground">Playground</a><a href="/docs" target="_blank" rel="noreferrer">API docs ↗</a></div></footer>
   </div>
   <script src="/assets/app.js"></script>
 </body>

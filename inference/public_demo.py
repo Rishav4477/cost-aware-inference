@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import os
 import time
 from collections import defaultdict, deque
@@ -45,6 +46,15 @@ def _clouds(values: list[str]):
     if any(value not in valid for value in values):
         raise HTTPException(400, "Cloud must be one of: aws, azure, gcp")
     return values
+
+
+def _provider_auth(request: Request):
+    expected = os.getenv("PUBLIC_DEMO_PROVIDER_KEY", "")
+    supplied = request.headers.get("authorization", "")
+    if not expected or not supplied.startswith("Bearer "):
+        raise HTTPException(404, "Not found")
+    if not hmac.compare_digest(expected.encode(), supplied[7:].encode()):
+        raise HTTPException(404, "Not found")
 
 
 def create_public_router():
@@ -125,6 +135,7 @@ def create_public_router():
     @router.post("/providers/{cloud}/v1/chat/completions", include_in_schema=False)
     async def provider(cloud: str, request: Request):
         _enabled(request)
+        _provider_auth(request)
         if cloud not in CLOUD_DELAYS_MS:
             raise HTTPException(404, "Unknown demo provider")
         body = await request.json()

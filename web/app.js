@@ -23,16 +23,19 @@ function renderStatus(data) {
     const card = document.createElement("div");
     card.className = "provider";
     const input = Number(provider.input_usd_per_million).toFixed(2);
+    const output = Number(provider.output_usd_per_million).toFixed(2);
     card.innerHTML = `
       <div class="provider-top">
-        <span class="provider-name">${provider.label}</span>
-        <span class="health">● ${provider.healthy ? "eligible" : "circuit open"}</span>
+        <div><span class="provider-name">${provider.label}</span><div class="provider-id">${provider.id}</div></div>
+        <span class="health ${provider.healthy ? "" : "down"}">● ${provider.healthy ? "eligible" : "circuit open"}</span>
       </div>
       <div class="provider-meta">
         <div><span>Latency</span><strong>${provider.latency_ms} ms</strong></div>
-        <div><span>Load</span><strong>${Math.round(provider.utilization * 100)}%</strong></div>
+        <div><span>Utilization</span><strong>${Math.round(provider.utilization * 100)}%</strong></div>
         <div><span>Input / 1M</span><strong>$${input}</strong></div>
-      </div>`;
+        <div><span>Output / 1M</span><strong>$${output}</strong></div>
+      </div>
+      <span class="trust ${provider.trusted ? "trusted" : ""}">${provider.trusted ? "Trusted for sensitive traffic" : "Standard provider"}</span>`;
     providerList.appendChild(card);
   });
 
@@ -84,9 +87,10 @@ async function runInference() {
   const failCloud = $("failureCloud").value;
   const button = $("runBtn");
   button.disabled = true;
-  button.textContent = "Routing…";
+  button.querySelector("span").textContent = "Routing…";
   setHidden("errorBox", true);
 
+  const started = performance.now();
   try {
     const response = await fetch("/public/infer", {
       method: "POST",
@@ -96,13 +100,16 @@ async function runInference() {
         allowed_clouds: allowedClouds,
         fail_clouds: failCloud ? [failCloud] : [],
         cache: $("cacheMode").value,
-        max_tokens: 128,
+        max_tokens: Number($("maxTokens").value),
+        sensitive: $("sensitiveToggle").checked,
       }),
     });
+    const roundTrip = performance.now() - started;
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Inference failed");
 
     const routing = data.routing || {};
+    const usage = data.usage || {};
     const message = data.choices?.[0]?.message?.content || "No response content";
     $("answer").textContent = message;
     $("routeBadge").textContent = `${String(routing.cloud || "?").toUpperCase()} selected`;
@@ -111,7 +118,10 @@ async function runInference() {
     $("metricAttempts").textContent = (routing.attempts || []).join(" → ") || "—";
     $("metricCache").textContent = routing.cache_hit || "miss";
     $("metricCost").textContent = dollars(routing.estimated_cost_usd);
-    $("metricTokens").textContent = data.usage?.total_tokens ?? "—";
+    $("metricReserved").textContent = dollars(routing.reserved_cost_usd);
+    $("metricPromptTokens").textContent = usage.prompt_tokens ?? "—";
+    $("metricOutputTokens").textContent = usage.completion_tokens ?? "—";
+    $("metricRoundTrip").textContent = `${Math.round(roundTrip)} ms`;
     setHidden("resultBox", false);
     await loadStatus();
   } catch (error) {
@@ -119,13 +129,18 @@ async function runInference() {
     $("errorBox").textContent = error.message;
   } finally {
     button.disabled = false;
-    button.textContent = "Run inference";
+    button.querySelector("span").textContent = "Run inference";
   }
 }
 
 $("runBtn").addEventListener("click", runInference);
 $("exampleBtn").addEventListener("click", () => {
   $("prompt").value = "Explain why a cost-aware router might choose a slightly slower cloud provider for an AI inference request.";
+  $("prompt").dispatchEvent(new Event("input"));
+});
+
+$("prompt").addEventListener("input", () => {
+  $("promptCount").textContent = `${$("prompt").value.length} / 4000`;
 });
 
 loadStatus();

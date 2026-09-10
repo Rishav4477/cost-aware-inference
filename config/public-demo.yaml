@@ -1,0 +1,51 @@
+# Public portfolio sandbox. Prices and provider responses are intentionally simulated.
+# The gateway/router/cache/quota/failover code path is the production implementation.
+demo: true
+attempt_timeout: 1
+breaker_threshold: 1
+breaker_cooldown: 4
+cache_ttl: 300
+weights:
+  cost: 0.55
+  latency: 0.25
+  utilization: 0.15
+  quality: 0.05
+providers:
+  - id: public-aws
+    cloud: aws
+    base_url: http://127.0.0.1:8000/public/providers/aws/v1
+    model: demo-model
+    aliases: [small]
+    input_usd_per_million: 0.10
+    output_usd_per_million: 0.30
+    latency_ms: 55
+    utilization: 0.72
+    quality: 0.97
+  - id: public-azure
+    cloud: azure
+    base_url: http://127.0.0.1:8000/public/providers/azure/v1
+    model: demo-model
+    aliases: [small]
+    input_usd_per_million: 0.14
+    output_usd_per_million: 0.35
+    latency_ms: 85
+    utilization: 0.20
+    quality: 0.98
+  - id: public-gcp
+    cloud: gcp
+    base_url: http://127.0.0.1:8000/public/providers/gcp/v1
+    model: demo-model
+    aliases: [small]
+    trusted: true
+    input_usd_per_million: 0.20
+    output_usd_per_million: 0.45
+    latency_ms: 120
+    utilization: 0.10
+    quality: 0.99
+    concurrency: 32
+tenants:
+  - id: public-demo
+    key_env: PUBLIC_DEMO_TENANT_KEY
+    requests_per_minute: 100000
+    tokens_per_minute: 100000000
+    daily_budget_usd: 100

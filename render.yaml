@@ -1,0 +1,27 @@
+services:
+  - type: keyvalue
+    name: cost-aware-inference-cache
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: off
+
+  - type: web
+    name: cost-aware-inference
+    runtime: docker
+    plan: free
+    healthCheckPath: /readyz
+    envVars:
+      - key: CONFIG_PATH
+        value: config/public-demo.yaml
+      - key: PUBLIC_DEMO_ENABLED
+        value: "true"
+      - key: PUBLIC_DEMO_TENANT_ID
+        value: public-demo
+      - key: PUBLIC_DEMO_TENANT_KEY
+        generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: cost-aware-inference-cache
+          property: connectionString

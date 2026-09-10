@@ -2,10 +2,12 @@ import asyncio
 import hmac
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config import Settings
@@ -13,6 +15,7 @@ from .gateway import Gateway
 from .jobs import Jobs
 from .models import CompletionRequest
 from .observability import Metrics, configure_tracing
+from .public_demo import create_public_router
 from .store import MemoryStore, RedisStore
 
 
@@ -23,7 +26,6 @@ class BodyLimit:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
-        # Buffer bounded request bodies, including chunked uploads.
         chunks, size = [], 0
         while True:
             message = await receive()
@@ -52,6 +54,12 @@ def create_app(settings=None, store=None, client=None):
     @asynccontextmanager
     async def lifespan(app):
         cfg = settings or Settings.load()
+        app.state.public_demo_enabled = os.getenv("PUBLIC_DEMO_ENABLED", "false").lower() == "true"
+        if app.state.public_demo_enabled:
+            port = os.getenv("PORT", "8000")
+            for provider in cfg.providers:
+                if provider.id.startswith("public-"):
+                    provider.base_url = f"http://127.0.0.1:{port}/public/providers/{provider.cloud}/v1"
         keys = {}
         for tenant in cfg.tenants:
             secret = os.getenv(tenant.key_env)
@@ -83,8 +91,9 @@ def create_app(settings=None, store=None, client=None):
             if tracing:
                 tracing.shutdown()
 
-    app = FastAPI(title="Cost-Aware Multi-Cloud Inference", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Cost-Aware Multi-Cloud Inference", version="0.2.0", lifespan=lifespan)
     app.add_middleware(BodyLimit)
+    app.include_router(create_public_router())
 
     async def authenticate(request: Request, authorization: str = Header(default="")):
         if not authorization.startswith("Bearer "):
@@ -109,7 +118,6 @@ def create_app(settings=None, store=None, client=None):
 
     @app.get("/metrics", include_in_schema=False)
     async def metrics(request: Request):
-        # Deploy on an internal service; restrict /metrics at the ingress.
         return Response(
             generate_latest(request.app.state.metrics.registry), media_type=CONTENT_TYPE_LATEST
         )
@@ -138,6 +146,16 @@ def create_app(settings=None, store=None, client=None):
     @app.get("/v1/jobs/{job_id}")
     async def job(job_id: str, request: Request, tenant=Depends(authenticate)):
         return await request.app.state.jobs.get(tenant, job_id)
+
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if web_dir.exists():
+        app.mount("/assets", StaticFiles(directory=web_dir), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def homepage(request: Request):
+        if getattr(request.app.state, "public_demo_enabled", False) and web_dir.exists():
+            return FileResponse(web_dir / "index.html")
+        return RedirectResponse("/docs")
 
     return app
 

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Interactive demo of a cost-aware multi-cloud AI inference router." />
+  <title>Cost-Aware Multi-Cloud Inference</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">PUBLIC SANDBOX</div>
+        <h1>Cost-Aware Multi-Cloud AI Inference</h1>
+        <p class="subtitle">Send one request. Watch the gateway score providers, route across clouds, fail over, and account for estimated cost.</p>
+      </div>
+      <div class="status-pill"><span class="dot"></span><span id="systemStatus">Checking system</span></div>
+    </header>
+
+    <section class="notice">
+      <strong>What is real in this demo?</strong>
+      <span>The FastAPI gateway, routing policy, circuit breaker, failover, cache, quota admission, cost accounting, and observability path are real. Provider responses and displayed cloud prices are simulated so the public demo can stay online without GPU spend.</span>
+    </section>
+
+    <main class="grid">
+      <section class="panel playground">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">INFERENCE PLAYGROUND</div>
+            <h2>Test the router</h2>
+          </div>
+          <button class="ghost" id="exampleBtn" type="button">Load example</button>
+        </div>
+
+        <label class="field-label" for="prompt">Prompt</label>
+        <textarea id="prompt" rows="7" maxlength="4000" placeholder="Ask something to send through the inference gateway..."></textarea>
+
+        <div class="controls-row">
+          <div>
+            <div class="field-label">Eligible clouds</div>
+            <div class="checks" id="cloudChecks">
+              <label><input type="checkbox" value="aws" checked> AWS</label>
+              <label><input type="checkbox" value="azure" checked> Azure</label>
+              <label><input type="checkbox" value="gcp" checked> GCP</label>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Simulate outage</div>
+            <select id="failureCloud">
+              <option value="">None</option>
+              <option value="aws">AWS</option>
+              <option value="azure">Azure</option>
+              <option value="gcp">GCP</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Cache</div>
+            <select id="cacheMode">
+              <option value="exact">Exact cache</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="runBtn" type="button">Run inference</button>
+          <span class="hint">Public limit: 30 requests/minute per IP</span>
+        </div>
+
+        <div class="result hidden" id="resultBox">
+          <div class="result-head">
+            <span>Response</span>
+            <span class="route-badge" id="routeBadge">—</span>
+          </div>
+          <div class="answer" id="answer"></div>
+          <div class="metrics-grid">
+            <div><span>Cloud</span><strong id="metricCloud">—</strong></div>
+            <div><span>Provider</span><strong id="metricProvider">—</strong></div>
+            <div><span>Attempts</span><strong id="metricAttempts">—</strong></div>
+            <div><span>Cache</span><strong id="metricCache">—</strong></div>
+            <div><span>Est. cost</span><strong id="metricCost">—</strong></div>
+            <div><span>Total tokens</span><strong id="metricTokens">—</strong></div>
+          </div>
+        </div>
+
+        <div class="error hidden" id="errorBox"></div>
+      </section>
+
+      <aside class="panel architecture-panel">
+        <div class="eyebrow">LIVE PLATFORM STATE</div>
+        <h2>Provider pool</h2>
+        <div id="providerList" class="providers"></div>
+
+        <div class="divider"></div>
+        <div class="eyebrow">ROUTING WEIGHTS</div>
+        <div id="weights" class="weights"></div>
+
+        <div class="divider"></div>
+        <div class="eyebrow">CONNECTED SERVICES</div>
+        <div id="services" class="services"></div>
+      </aside>
+    </main>
+
+    <section class="panel flow-panel">
+      <div class="panel-head">
+        <div>
+          <div class="eyebrow">REQUEST PATH</div>
+          <h2>How one request moves through the system</h2>
+        </div>
+      </div>
+      <div class="flow">
+        <div class="node"><span>1</span><strong>Browser</strong><small>Public playground</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><span>2</span><strong>FastAPI Gateway</strong><small>Validation + quota</small></div>
+        <div class="arrow">→</div>
+        <div class="node accent"><span>3</span><strong>Weighted Router</strong><small>Cost + latency + load</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><span>4</span><strong>Cloud Provider</strong><small>AWS / Azure / GCP</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><span>5</span><strong>Telemetry</strong><small>Metrics + accounting</small></div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Cost-Aware Multi-Cloud AI Inference Platform</span>
+      <a href="/docs" target="_blank" rel="noreferrer">Open API docs ↗</a>
+    </footer>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -16,6 +16,7 @@ providers:
     base_url: http://127.0.0.1:8000/public/providers/aws/v1
     model: demo-model
     aliases: [small]
+    api_key_env: PUBLIC_DEMO_PROVIDER_KEY
     input_usd_per_million: 0.10
     output_usd_per_million: 0.30
     latency_ms: 55
@@ -26,6 +27,7 @@ providers:
     base_url: http://127.0.0.1:8000/public/providers/azure/v1
     model: demo-model
     aliases: [small]
+    api_key_env: PUBLIC_DEMO_PROVIDER_KEY
     input_usd_per_million: 0.14
     output_usd_per_million: 0.35
     latency_ms: 85
@@ -36,6 +38,7 @@ providers:
     base_url: http://127.0.0.1:8000/public/providers/gcp/v1
     model: demo-model
     aliases: [small]
+    api_key_env: PUBLIC_DEMO_PROVIDER_KEY
     trusted: true
     input_usd_per_million: 0.20
     output_usd_per_million: 0.45
